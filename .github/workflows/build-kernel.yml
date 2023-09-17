@@ -1,0 +1,81 @@
+name: build-kernel
+on:
+  workflow_dispatch:
+    inputs:
+      build_args:
+        description: 'Arguments for build.sh script'
+        required: true
+        default: '--ksunext --susfs marble'
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Set swap space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git ccache pngcrush schedtool maven lib32ncurses5-dev xsltproc libxml2-utils squashfs-tools lzop flex build-essential bc libssl-dev libswitch-perl libxml-simple-perl zip unzip g++-multilib bison gperf zlib1g-dev automake device-tree-compiler
+          sudo curl --create-dirs -o /usr/local/bin/repo -L https://storage.googleapis.com/git-repo-downloads/repo
+          sudo chmod a+rx /usr/local/bin/repo  
+      - name: Validate parameters
+        run: |
+          BUILD_ARGS="${{ github.event.inputs.build_args || '--ksunext --susfs marble' }}"
+          if [[ "$BUILD_ARGS" == *"--ksunext"* ]]; then
+            KSUNEXT_ENABLE=true
+            KSU_STRING="_KSUNext"
+            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
+          fi
+          if [[ "$BUILD_ARGS" == *"--sukisu"* ]]; then
+            SUKISU_ENABLE=true
+            KSU_STRING="_SukiSU"
+            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
+          fi
+          if [[ "$BUILD_ARGS" == *"--susfs"* ]]; then
+            SUSFS_ENABLE=true
+            SUSFS_STRING="_SuSFS"
+            echo "SUSFS_STRING=$SUSFS_STRING" >> $GITHUB_ENV
+          fi
+
+          if [[ $KSUNEXT_ENABLE && $SUKISU_ENABLE ]]; then
+            echo "Enable only either KSU Next (--ksunext) or SukiSU (--sukisu)"
+            exit 1
+          fi
+      - name: Set Zip filename variable
+        id: zipname
+        run: |
+          echo "zipfile="AOSPA_marble${{ env.KSU_STRING }}${{ env.SUSFS_STRING }}_$(date +%Y%m%d_%H%M%S)_anykernel3.zip"" >> "$GITHUB_OUTPUT"
+      - name: Clone repo and sync
+        run: |
+          repo init -u https://github.com/tiltshiftfocus/kernel_manifest -b vauxite-next-susfs --depth=1
+          repo sync
+          mkdir -p kernel_platform/device/xiaomi/marble-kernel/dtbs
+      - name: Build kernel
+        run: |
+          cd kernel_platform/xiaomi/sm8450
+          ./build.sh ${{ github.event.inputs.build_args || '--ksunext --susfs marble' }}
+      - name: Zip output
+        run: |
+          cp kernel_platform/device/xiaomi/marble-kernel/Image AnyKernel3
+          cd AnyKernel3
+          rm -r .git README.md
+          find . -type f -name 'placeholder' -delete
+          find . -type d -empty -delete
+          zip -r9 "../${{ steps.zipname.outputs.zipfile }}" *
+      - name: Generate release tag
+        id: tag
+        run: echo "release_tag=$(date +'%Y%m%d')" >> "$GITHUB_OUTPUT"
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          files: |
+            ${{ steps.zipname.outputs.zipfile }}
+      - name: Upload marble-kernel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marble-kernel
+          path: AnyKernel3/*
