@@ -89,17 +89,11 @@ jobs:
           find . -type f -name 'placeholder' -delete
           find . -type d -empty -delete
           zip -r9 "../${{ steps.zipname.outputs.zipfile }}" *
-      - name: Generate release tag
-        id: tag
-        run: echo "release_tag=$(date +'%Y%m%d')" >> "$GITHUB_OUTPUT"
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.release_tag }}
-          files: |
-            ${{ steps.zipname.outputs.zipfile }}
       - name: Upload marble-kernel artifact
         uses: actions/upload-artifact@v4
         with:
           name: marble-kernel
-          path: AnyKernel3/*
+          compression-level: 9
+          path: |
+            AnyKernel3/*
+            ${{ steps.zipname.outputs.zipfile }}
