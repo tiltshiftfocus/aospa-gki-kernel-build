@@ -26,12 +26,10 @@ jobs:
           KSU_STRING="_KSU"
           if [ ${{ github.event.inputs.use-ksun }} == 'true' ]; then
             KSU_STRING="_KSUNext"
-            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
             BUILD_PARAMS="--ksun"
           fi
           if [ ${{ github.event.inputs.use-suki }} == 'true' ]; then
             KSU_STRING="_SukiSU"
-            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
             BUILD_PARAMS="--sukisu"
           fi
           if [ ${{ github.event.inputs.use-susfs }} == 'true' ]; then
@@ -46,6 +44,7 @@ jobs:
           fi
 
           BUILD_PARAMS+=" marble" 
+          echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
           echo "BUILD_PARAMS=$BUILD_PARAMS" >> $GITHUB_ENV
       - name: Set Zip filename variable
         id: zipname
