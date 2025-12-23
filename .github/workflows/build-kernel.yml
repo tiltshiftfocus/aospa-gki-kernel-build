@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl git ccache pngcrush schedtool maven lib32ncurses5-dev xsltproc libxml2-utils squashfs-tools lzop flex build-essential bc libssl-dev libswitch-perl libxml-simple-perl zip unzip g++-multilib bison gperf zlib1g-dev automake device-tree-compiler
           sudo curl --create-dirs -o /usr/local/bin/repo -L https://storage.googleapis.com/git-repo-downloads/repo
-          sudo chmod a+rx /usr/local/bin/repo
+          sudo chmod a+rx /usr/local/bin/repo  
       - name: Validate parameters
         run: |
           BUILD_ARGS="${{ github.event.inputs.build_args || '--ksunext --susfs marble' }}"
@@ -44,10 +44,6 @@ jobs:
             echo "Enable only either KSU Next (--ksunext) or SukiSU (--sukisu)"
             exit 1
           fi
-          if [[ $SUSFS_ENABLE && (! $KSUNEXT_ENABLE && ! $SUKISU_ENABLE) ]]; then
-            echo "SUSFS (--susfs) requires either KSU Next (--ksunext) or SukiSU (--sukisu)"
-            exit 1
-          fi 
       - name: Set Zip filename variable
         id: zipname
         run: |
