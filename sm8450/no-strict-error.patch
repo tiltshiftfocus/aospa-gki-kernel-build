@@ -1,0 +1,22 @@
+From a756440f84a8ac2dc83b7461fb969a8c3dd7ea3d Mon Sep 17 00:00:00 2001
+From: Jerry <zmdroid91@gmail.com>
+Date: Fri, 25 Jul 2025 03:12:39 +0800
+Subject: [PATCH] update Makefile
+
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index b73a6c4bf284..a97e6e1cd1a7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -521,7 +521,7 @@ LINUXINCLUDE    := \
+ 		$(USERINCLUDE)
+ 
+ KBUILD_AFLAGS   := -D__ASSEMBLY__ -fno-PIE
+-KBUILD_CFLAGS   := -Wall -Wundef -Werror=strict-prototypes -Wno-trigraphs \
++KBUILD_CFLAGS   := -Wall -Wundef -Wno-trigraphs \
+ 		   -fno-strict-aliasing -fno-common -fshort-wchar -fno-PIE \
+ 		   -Werror=implicit-function-declaration -Werror=implicit-int \
+ 		   -Werror=return-type -Wno-format-security \

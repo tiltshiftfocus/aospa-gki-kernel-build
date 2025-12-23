@@ -2,61 +2,86 @@ name: build-kernel
 on:
   workflow_dispatch:
     inputs:
-      build_args:
-        description: 'Arguments for build.sh script'
-        required: true
-        default: '--ksunext --susfs marble'
+      use-ksun:
+        type: boolean
+        description: 'Build KernelSU Next'
+      use-suki:
+        type: boolean
+        description: 'Build SukiSU'
+      use-susfs:
+        type: boolean
+        description: 'Patch SuSFS'
+      #build_args:
+      #  description: 'Arguments for build.sh script (--ksunext, --sukisu, --susfs), use only --susfs to patch SuSFS into official KernelSU'
+      #  required: true
+      #  default: '--susfs marble'
 
 jobs:
   build-kernel:
     runs-on: ubuntu-22.04
     steps:
+      - name: Validate parameters
+        id: validate-params
+        run: |
+          KSU_STRING="_KSU"
+          if [ ${{ github.event.inputs.use-ksun }} == 'true' ]; then
+            KSU_STRING="_KSUNext"
+            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
+            BUILD_PARAMS="--ksun"
+          fi
+          if [ ${{ github.event.inputs.use-suki }} == 'true' ]; then
+            KSU_STRING="_SukiSU"
+            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
+            BUILD_PARAMS="--sukisu"
+          fi
+          if [ ${{ github.event.inputs.use-susfs }} == 'true' ]; then
+            SUSFS_STRING="_SuSFS"
+            echo "SUSFS_STRING=$SUSFS_STRING" >> $GITHUB_ENV
+            BUILD_PARAMS+=" --susfs"
+          fi
+
+          if [ ${{ github.event.inputs.use-ksun }} == 'true' ] && [ ${{ github.event.inputs.use-suki }} == 'true' ]; then
+            echo "Enable only either KernelSU Next or SukiSU"
+            exit 1
+          fi
+
+          BUILD_PARAMS+=" marble" 
+          echo "build_params="$BUILD_PARAMS"" >> "$GITHUB_OUTPUT"
       - name: Set swap space
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 10
+      - name: Checkout build repo
+        uses: actions/checkout@v6
+        with:
+          path: aospa-gki-kernel-build
       - name: Setup build environment
         run: |
           sudo apt-get update
           sudo apt-get install -y curl git ccache pngcrush schedtool maven lib32ncurses5-dev xsltproc libxml2-utils squashfs-tools lzop flex build-essential bc libssl-dev libswitch-perl libxml-simple-perl zip unzip g++-multilib bison gperf zlib1g-dev automake device-tree-compiler
           sudo curl --create-dirs -o /usr/local/bin/repo -L https://storage.googleapis.com/git-repo-downloads/repo
           sudo chmod a+rx /usr/local/bin/repo  
-      - name: Validate parameters
-        run: |
-          BUILD_ARGS="${{ github.event.inputs.build_args || '--ksunext --susfs marble' }}"
-          if [[ "$BUILD_ARGS" == *"--ksunext"* ]]; then
-            KSUNEXT_ENABLE=true
-            KSU_STRING="_KSUNext"
-            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
-          fi
-          if [[ "$BUILD_ARGS" == *"--sukisu"* ]]; then
-            SUKISU_ENABLE=true
-            KSU_STRING="_SukiSU"
-            echo "KSU_STRING=$KSU_STRING" >> $GITHUB_ENV
-          fi
-          if [[ "$BUILD_ARGS" == *"--susfs"* ]]; then
-            SUSFS_ENABLE=true
-            SUSFS_STRING="_SuSFS"
-            echo "SUSFS_STRING=$SUSFS_STRING" >> $GITHUB_ENV
-          fi
-
-          if [[ $KSUNEXT_ENABLE && $SUKISU_ENABLE ]]; then
-            echo "Enable only either KSU Next (--ksunext) or SukiSU (--sukisu)"
-            exit 1
-          fi
       - name: Set Zip filename variable
         id: zipname
         run: |
           echo "zipfile="AOSPA_marble${{ env.KSU_STRING }}${{ env.SUSFS_STRING }}_$(date +%Y%m%d_%H%M%S)_anykernel3.zip"" >> "$GITHUB_OUTPUT"
       - name: Clone repo and sync
         run: |
-          repo init -u https://github.com/tiltshiftfocus/kernel_manifest -b vauxite-next-susfs --depth=1
+          repo init -u https://github.com/tiltshiftfocus/aospa-gki-kernel-build -b main-marble -m build-manifest.xml --depth=1
           repo sync
           mkdir -p kernel_platform/device/xiaomi/marble-kernel/dtbs
+      - name: Patch with custom configurations
+        run: |
+          cp -rf aospa-gki-kernel-build/sm8450/. kernel_platform/xiaomi/sm8450
+          cd kernel_platform/xiaomi/sm8450
+          patch -p1 < no-strict-error.patch 
       - name: Build kernel
         run: |
+          BUILD_PARAMS=${{ steps.validate-params.outputs.build_params }}
+          echo "Build params: $BUILD_PARAMS"
+
           cd kernel_platform/xiaomi/sm8450
-          ./build.sh ${{ github.event.inputs.build_args || '--ksunext --susfs marble' }}
+          ./build.sh "$BUILD_PARAMS"
       - name: Zip output
         run: |
           cp kernel_platform/device/xiaomi/marble-kernel/Image AnyKernel3
